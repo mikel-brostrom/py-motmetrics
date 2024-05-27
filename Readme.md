@@ -71,6 +71,9 @@ print(mh.list_metrics_markdown())
 | pred_frequencies     | `pd.Series` Total number of occurrences of individual predictions over all frames. |
 | track_ratios         | `pd.Series` Ratio of assigned to total appearance count per unique object id.      |
 | id_global_assignment | `dict` ID measures: Global min-cost assignment for ID measures.                    |
+| deta_alpha           | HOTA: Detection Accuracy (DetA) for a given threshold.                             |
+| assa_alpha           | HOTA: Association Accuracy (AssA) for a given threshold.                           |
+| hota_alpha           | HOTA: Higher Order Tracking Accuracy (HOTA) for a given threshold.                 |
 
 <a name="MOTChallengeCompatibility"></a>
 
@@ -359,6 +362,54 @@ print(strsummary)
 full    83.3% 83.3% 83.3% 83.3% 83.3%  2  1  1  0  1  1   1   1 50.0% 0.340
 part    75.0% 75.0% 75.0% 75.0% 75.0%  2  1  1  0  1  1   0   0 50.0% 0.167
 OVERALL 80.0% 80.0% 80.0% 80.0% 80.0%  4  2  2  0  2  2   1   1 50.0% 0.275
+"""
+```
+
+#### [Underdeveloped] Computing HOTA metrics
+
+Computing HOTA metrics is also possible. However, it cannot be used with the `Accumulator` class directly, as HOTA requires to computing a reweighting matrix from all the frames at the beginning. Here is an example of how to use it:
+
+```python
+import os
+import numpy as np
+import motmetrics as mm
+
+
+def compute_motchallenge(dir_name):
+    # `gt.txt` and `test.txt` should be prepared in MOT15 format
+    df_gt = mm.io.loadtxt(os.path.join(dir_name, "gt.txt"))
+    df_test = mm.io.loadtxt(os.path.join(dir_name, "test.txt"))
+    # Require different thresholds for matching
+    th_list = np.arange(0.05, 0.99, 0.05)
+    res_list = mm.utils.compare_to_groundtruth_reweighting(df_gt, df_test, "iou", distth=th_list)
+    return res_list
+
+# `data_dir` is the directory containing the gt.txt and test.txt files
+acc = compute_motchallenge("data_dir")
+mh = mm.metrics.create()
+
+summary = mh.compute_many(
+    acc,
+    metrics=[
+        "deta_alpha",
+        "assa_alpha",
+        "hota_alpha",
+    ],
+    generate_overall=True,  # `Overall` is the average we need only
+)
+strsummary = mm.io.render_summary(
+    summary.iloc[[-1], :],  # Use list to preserve `DataFrame` type
+    formatters=mh.formatters,
+    namemap={"hota_alpha": "HOTA", "assa_alpha": "ASSA", "deta_alpha": "DETA"},
+)
+print(strsummary)
+"""
+# data_dir=motmetrics/data/TUD-Campus
+         DETA  ASSA  HOTA
+OVERALL 41.8% 36.9% 39.1%
+# data_dir=motmetrics/data/TUD-Stadtmitte
+         DETA  ASSA  HOTA
+OVERALL 39.2% 40.9% 39.8%
 """
 ```
 
