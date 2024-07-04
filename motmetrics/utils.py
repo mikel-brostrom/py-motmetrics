@@ -139,6 +139,7 @@ def compare_to_groundtruth_reweighting(gt, dt, dist="iou", distfields=None, dist
         oids = np.empty(0)
         hids = np.empty(0)
         weighted_dists = np.empty((0, 0))
+        dists = np.empty((0, 0))
         if fid in fid_to_fgt:
             fgt = fid_to_fgt[fid]
             oids = fgt.index.get_level_values("Id")
