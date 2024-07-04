@@ -375,17 +375,28 @@ import numpy as np
 import motmetrics as mm
 
 
-def compute_motchallenge(dir_name):
-    # `gt.txt` and `test.txt` should be prepared in MOT15 format
-    df_gt = mm.io.loadtxt(os.path.join(dir_name, "gt.txt"))
-    df_test = mm.io.loadtxt(os.path.join(dir_name, "test.txt"))
-    # Require different thresholds for matching
-    th_list = np.arange(0.05, 0.99, 0.05)
-    res_list = mm.utils.compare_to_groundtruth_reweighting(df_gt, df_test, "iou", distth=th_list)
-    return res_list
+def compute_motchallenge(gt_files, test_files):
+    
+    accs = []
+    for gt_file, test_file in zip(gt_files, test_files):
 
-# `data_dir` is the directory containing the gt.txt and test.txt files
-acc = compute_motchallenge("data_dir")
+        df_gt = mm.io.loadtxt(gt_file)
+        df_test = mm.io.loadtxt(test_file)
+
+        # HOTA requires different thresholds for matching
+        th_list = np.arange(0.05, 0.99, 0.05)
+        # Compare ground truth and test data
+        accs.append(mm.utils.compare_to_groundtruth_reweighting(df_gt, df_test, "iou", distth=th_list))
+    
+    # flatten as compare_to_groundtruth_reweighting generates a 2D list
+    if all(isinstance(sublist, list) for sublist in accs):
+        accs = [j for sub in accs for j in sub]
+    return accs
+
+# ground truth and test file paths
+gt_files = ['path/to/gt1.txt', 'path/to/gt2.txt']
+test_files = ['path/to/test.txt', 'path/to/test2.txt']
+
 mh = mm.metrics.create()
 
 summary = mh.compute_many(
