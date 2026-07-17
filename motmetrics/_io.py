@@ -7,8 +7,6 @@
 
 """Functions for loading data and writing summaries."""
 
-from __future__ import absolute_import, division, print_function
-
 import io
 import shlex
 import xml.etree.ElementTree
@@ -17,7 +15,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import scipy.io
 
 
 class Format(Enum):
@@ -74,16 +71,17 @@ def load_motchallenge(fname, **kwargs):
         The dataframe is indexed by ('FrameId', 'Id')
     """
 
-    sep = kwargs.pop('sep', r'\s+|\t+|,')
+    sep = kwargs.pop('sep', None)
     min_confidence = kwargs.pop('min_confidence', -1)
+    read_sep, engine = _motchallenge_read_options(fname, sep)
     df = pd.read_csv(
         fname,
-        sep=sep,
+        sep=read_sep,
         index_col=[0, 1],
         skipinitialspace=True,
         header=None,
         names=['FrameId', 'Id', 'X', 'Y', 'Width', 'Height', 'Confidence', 'ClassId', 'Visibility', 'unused'],
-        engine='python'
+        engine=engine,
     )
 
     # Account for matlab convention.
@@ -94,6 +92,27 @@ def load_motchallenge(fname, **kwargs):
 
     # Remove all rows without sufficient confidence
     return df[df['Confidence'] >= min_confidence]
+
+
+def _motchallenge_read_options(fname, sep):
+    if sep is None:
+        return (_infer_motchallenge_separator(fname), 'c')
+    if sep in (',', r'\s+'):
+        return (sep, 'c')
+    return (sep, 'python')
+
+
+def _infer_motchallenge_separator(fname):
+    if hasattr(fname, 'read'):
+        position = fname.tell()
+        first_line = next((line for line in fname if line.strip()), '')
+        fname.seek(position)
+    else:
+        with io.open(fname, encoding='utf-8', errors='ignore') as file:
+            first_line = next((line for line in file if line.strip()), '')
+    if isinstance(first_line, bytes):
+        first_line = first_line.decode('utf-8', errors='ignore')
+    return ',' if ',' in first_line else r'\s+'
 
 
 def load_vatictxt(fname, **kwargs):
@@ -211,7 +230,9 @@ def load_detrac_mat(fname, **kwargs):
         The dataframe is indexed by ('FrameId', 'Id')
     """
 
-    mat_data = scipy.io.loadmat(fname)
+    from scipy.io import loadmat
+
+    mat_data = loadmat(fname)
 
     frame_list = mat_data['gtInfo'][0][0][4][0]
     left_array = mat_data['gtInfo'][0][0][0].astype(np.float32)
@@ -387,9 +408,8 @@ def render_summary(summary, formatters=None, namemap=None, buf=None):
     buf : StringIO-like, optional
         Buffer to write to
     formatters : dict, optional
-        Dicionary defining custom formatters for individual metrics.
-        I.e `{'mota': '{:.2%}'.format}`. You can get preset formatters
-        from MetricsHost.formatters
+        Dictionary defining custom formatters for individual metrics, such as
+        ``{'mota': '{:.2%}'.format}``.
     namemap : dict, optional
         Dictionary defining new metric names for display. I.e
         `{'num_false_positives': 'FP'}`.
